@@ -13,7 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PaymentApi.Core\PaymentApi.Core.csproj" />
     <ProjectReference Include="..\PaymentApi.DataAccess\PaymentApi.DataAccess.csproj" />
-    <ProjectReference Include="..\PaymentApi.Entities\PaymentApi.Core.csproj" />
+    <ProjectReference Include="..\PaymentApi.Core\PaymentApi.Core.csproj" />
   </ItemGroup>
 
 </Project>

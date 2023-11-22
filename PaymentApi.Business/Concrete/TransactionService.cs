@@ -1,5 +1,4 @@
-﻿using MailChimp.Net.Core;
-using PaymentApi.API.Modals;
+﻿using PaymentApi.API.Modals;
 using PaymentApi.Business.Abstract;
 using PaymentApi.Business.Modals;
 using PaymentApi.DataAccess.Repositories.Abstract;
