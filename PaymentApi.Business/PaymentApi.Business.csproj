@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ServiceStack.Client" Version="6.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PaymentApi.Core\PaymentApi.Core.csproj" />
+    <ProjectReference Include="..\PaymentApi.DataAccess\PaymentApi.DataAccess.csproj" />
+    <ProjectReference Include="..\PaymentApi.Entities\PaymentApi.Core.csproj" />
+  </ItemGroup>
+
+</Project>
