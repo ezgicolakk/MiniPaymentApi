@@ -10,6 +10,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using PaymentApi.DataAccess.Context;
+using Microsoft.EntityFrameworkCore;
+using PaymentApi.Core.Enums;
 
 namespace PaymentApi.Business.Concrete
 {
@@ -23,8 +25,66 @@ namespace PaymentApi.Business.Concrete
         }
         public TransactionResult Cancel(CancelRequest request)
         {
-            throw new NotImplementedException();
-        }
+            var transaction = _dbContext.Transactions
+           .Include(t => t.TransactionDetails)
+           .FirstOrDefault(t => t.Id == new Guid(request.TransactionId.ToString()));
+
+            if (transaction == null)
+            {
+                return new TransactionResult
+                {
+                    Success = false,
+                    Message = "Transaction not found."
+                };
+            }
+
+            if (transaction.Status == (System.Transactions.TransactionStatus)TransactionStatus.Success &&
+                transaction.TransactionDate.Date == DateTime.UtcNow.Date)
+            {
+               
+                var cancelTransaction = new Transaction
+                {
+                    Id = Guid.NewGuid(),
+                    BankId = transaction.BankId,
+                    TotalAmount = -transaction.TotalAmount,
+                    NetAmount = -transaction.NetAmount,
+                    Status = (System.Transactions.TransactionStatus)TransactionStatus.Success,
+                    OrderReference = transaction.OrderReference,
+                    TransactionDate = DateTime.UtcNow
+                };
+
+                
+                var cancelTransactionDetail = new TransactionDetail
+                {
+                    Id = Guid.NewGuid(),
+                    TransactionType = TransactionType.Cancel,
+                    Status = TransactionStatus.Success,
+                    Amount = -transaction.TotalAmount
+                };
+
+                cancelTransaction.TransactionDetails.Add(cancelTransactionDetail);
+
+                transaction.NetAmount = 0;
+
+             
+                _dbContext.Transactions.Add(cancelTransaction);
+                _dbContext.SaveChanges();
+
+                return new TransactionResult
+                {
+                    Success = true,
+                    Message = "Cancellation successful."
+                };
+            }
+            else
+            {
+                return new TransactionResult
+                {
+                    Success = false,
+                    Message = "Cancellation not allowed for this transaction."
+                };
+            }
+        }    
 
         public TransactionReport GenerateReport(DataAccess.Repositories.Modals.ReportRequest request)
         {
