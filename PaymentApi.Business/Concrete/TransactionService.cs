@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using PaymentApi.DataAccess.Context;
 using Microsoft.EntityFrameworkCore;
 using PaymentApi.Core.Enums;
+using PaymentApi.DataAccess.Repositories.Modals;
 
 namespace PaymentApi.Business.Concrete
 {
@@ -41,7 +42,7 @@ namespace PaymentApi.Business.Concrete
             if (transaction.Status == (System.Transactions.TransactionStatus)TransactionStatus.Success &&
                 transaction.TransactionDate.Date == DateTime.UtcNow.Date)
             {
-               
+
                 var cancelTransaction = new Transaction
                 {
                     Id = Guid.NewGuid(),
@@ -53,7 +54,7 @@ namespace PaymentApi.Business.Concrete
                     TransactionDate = DateTime.UtcNow
                 };
 
-                
+
                 var cancelTransactionDetail = new TransactionDetail
                 {
                     Id = Guid.NewGuid(),
@@ -66,7 +67,7 @@ namespace PaymentApi.Business.Concrete
 
                 transaction.NetAmount = 0;
 
-             
+
                 _dbContext.Transactions.Add(cancelTransaction);
                 _dbContext.SaveChanges();
 
@@ -84,11 +85,33 @@ namespace PaymentApi.Business.Concrete
                     Message = "Cancellation not allowed for this transaction."
                 };
             }
-        }    
+        }
 
-        public TransactionReport GenerateReport(DataAccess.Repositories.Modals.ReportRequest request)
+        public TransactionReport GenerateReport(ReportRequest request)
         {
-            throw new NotImplementedException();
+            var query = _dbContext.Transactions
+                .Include(t => t.TransactionDetails)
+                .Where(t =>
+                    (request.BankId == null || t.BankId == request.BankId) &&
+                    (request.Status == null || t.Status == (System.Transactions.TransactionStatus)request.Status) &&
+                    (string.IsNullOrEmpty(request.OrderReference) || t.OrderReference == request.OrderReference) &&
+                    (request.StartDate == null || t.TransactionDate >= request.StartDate) &&
+                    (request.EndDate == null || t.TransactionDate <= request.EndDate));
+
+            
+            if (request.TransactionType != null)
+            {
+                query = query.Where(t => t.TransactionDetails.Any(td => td.TransactionType == request.TransactionType));
+            }
+
+           
+            var report = new TransactionReport
+            {
+                Transactions = query.ToList(),
+                GeneratedAt = DateTime.UtcNow
+            };
+
+            return report;
         }
 
         public TransactionResult Pay(PayRequest request)
@@ -98,8 +121,8 @@ namespace PaymentApi.Business.Concrete
                 Id = Guid.NewGuid(),
                 BankId = request.BankId,
                 TotalAmount = request.Amount,
-                NetAmount = request.Amount, 
-                Status = 0, 
+                NetAmount = request.Amount,
+                Status = 0,
                 OrderReference = request.OrderReference,
                 TransactionDate = DateTime.Now,
                 TransactionDetails = new List<TransactionDetail>
@@ -108,7 +131,7 @@ namespace PaymentApi.Business.Concrete
                 {
                     Id = Guid.NewGuid(),
                     TransactionType = 0,
-                    Status = 0, 
+                    Status = 0,
                     Amount = request.Amount
                 }
             }
