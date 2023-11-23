@@ -1,27 +1,29 @@
+using PaymentApi.Business.Abstract;
+using PaymentApi.Business.Concrete;
+using PaymentApi.DataAccess.Context;
+
 var builder = WebApplication.CreateBuilder(args);
+
+
+builder.Services.AddControllers();
+
+builder.Services.AddDbContext<PaymentDbContext>();
+
+builder.Services.AddScoped<ITransactionService, TransactionService>();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 var app = builder.Build();
 
-app.UseRouting();
-
-app.UseEndpoints(endpoints =>
+if (app.Environment.IsDevelopment())
 {
-    endpoints.Map("api/map", async (context) =>
-    {
-        await context.Response.WriteAsync("common method Get");
-    });
-    endpoints.MapGet("api/mapget", async (context) =>
-    {
-        await context.Response.WriteAsync("only Get req's");
-    });
-    endpoints.MapPost("api/mappost", async (context) =>
-    {
-        await context.Response.WriteAsync("only Post req's");
-    });
-});
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
-app.Run(async context =>
-{
-    await context.Response.WriteAsync("only Post req's");
-});
+app.UseAuthorization();
+
+app.MapControllers();
 
 app.Run();
