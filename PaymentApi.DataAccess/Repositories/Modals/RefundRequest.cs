@@ -2,7 +2,7 @@
 {
     public class RefundRequest
     {
-        public int TransactionId { get; set; }
+        public string TransactionId { get; set; }
         public decimal RefundAmount { get; set; }
     }
 }

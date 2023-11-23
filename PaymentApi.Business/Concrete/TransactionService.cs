@@ -27,65 +27,97 @@ namespace PaymentApi.Business.Concrete
 
         public TransactionResult Cancel(CancelRequest request)
         {
-            var transaction = _dbContext.Transactions
+            using var dbTransaction = _dbContext.Database.BeginTransaction();
+
+            try
+            {
+                var transaction = _dbContext.Transactions
            .Include(t => t.TransactionDetails)
-           .FirstOrDefault(t => t.Id == new Guid(request.TransactionId.ToString()));
+           .FirstOrDefault(t => t.Id == new Guid(request.TransactionId));
 
-            if (transaction == null)
+                if (transaction == null)
+                {
+                    return new TransactionResult
+                    {
+                        Success = false,
+                        Message = "Transaction not found."
+                    };
+                }
+
+                if (transaction.Status == TransactionStatus.Success &&
+                    transaction.TransactionDate.Date == DateTime.UtcNow.Date)
+                {
+                    var cancelId = Guid.NewGuid();
+
+                    var cancelTransaction = new Transaction
+                    {
+                        Id = cancelId,
+                        BankId = transaction.BankId,
+                        TotalAmount = -transaction.TotalAmount,
+                        NetAmount = 0,
+                        Status = TransactionStatus.Success,
+                        OrderReference = transaction.OrderReference,
+                        TransactionDate = DateTime.UtcNow
+                    };
+
+
+                    var cancelTransactionDetail = new TransactionDetail
+                    {
+                        Id = Guid.NewGuid(),
+                        TransactionId = cancelId,
+                        TransactionType = TransactionType.Cancel,
+                        Status = TransactionStatus.Success,
+                        Amount = transaction.TotalAmount
+                    };
+
+                    _dbContext.TransactionDetails.Add(cancelTransactionDetail);
+
+                    transaction.NetAmount = 0;
+
+                    _dbContext.Transactions.Update(transaction);
+                    _dbContext.Transactions.Add(cancelTransaction);
+                    var result = _dbContext.SaveChanges();
+
+                    if (result == 0)
+                    {
+                        throw new Exception();
+                    }
+                    else
+                    {
+                        dbTransaction.Commit();
+                    }
+
+                    return new TransactionResult
+                    {
+                        Success = true,
+                        Status = cancelTransaction.Status,
+                        Message = "Cancellation successful.",
+                        TransactionId = cancelId
+                    };
+                }
+                else
+                {
+                    dbTransaction.Rollback();
+
+                    return new TransactionResult
+                    {
+                        Success = false,
+                        Message = "Cancellation not allowed for this transaction."
+                    };
+                }
+
+            }
+            catch (Exception ex)
             {
+                dbTransaction.Rollback();
+
                 return new TransactionResult
                 {
                     Success = false,
-                    Message = "Transaction not found."
+                    Message = ex.Message
                 };
             }
 
-            if (transaction.Status == (System.Transactions.TransactionStatus)TransactionStatus.Success &&
-                transaction.TransactionDate.Date == DateTime.UtcNow.Date)
-            {
-
-                var cancelTransaction = new Transaction
-                {
-                    Id = Guid.NewGuid(),
-                    BankId = transaction.BankId,
-                    TotalAmount = -transaction.TotalAmount,
-                    NetAmount = -transaction.NetAmount,
-                    Status = (System.Transactions.TransactionStatus)TransactionStatus.Success,
-                    OrderReference = transaction.OrderReference,
-                    TransactionDate = DateTime.UtcNow
-                };
-
-
-                var cancelTransactionDetail = new TransactionDetail
-                {
-                    Id = Guid.NewGuid(),
-                    TransactionType = TransactionType.Cancel,
-                    Status = TransactionStatus.Success,
-                    Amount = -transaction.TotalAmount
-                };
-
-                cancelTransaction.TransactionDetails.Add(cancelTransactionDetail);
-
-                transaction.NetAmount = 0;
-
-
-                _dbContext.Transactions.Add(cancelTransaction);
-                _dbContext.SaveChanges();
-
-                return new TransactionResult
-                {
-                    Success = true,
-                    Message = "Cancellation successful."
-                };
-            }
-            else
-            {
-                return new TransactionResult
-                {
-                    Success = false,
-                    Message = "Cancellation not allowed for this transaction."
-                };
-            }
         }
 
         public TransactionReport GenerateReport(ReportRequest request)
@@ -94,7 +126,7 @@ namespace PaymentApi.Business.Concrete
                 .Include(t => t.TransactionDetails)
                 .Where(t =>
                     (request.BankId == null || t.BankId == request.BankId) &&
-                    (request.Status == null || t.Status == (System.Transactions.TransactionStatus)request.Status) &&
+                    (request.Status == null || t.Status == request.Status) &&
                     (string.IsNullOrEmpty(request.OrderReference) || t.OrderReference == request.OrderReference) &&
                     (request.StartDate == null || t.TransactionDate >= request.StartDate) &&
                     (request.EndDate == null || t.TransactionDate <= request.EndDate));
@@ -117,16 +149,18 @@ namespace PaymentApi.Business.Concrete
 
         public TransactionResult Pay(PayRequest request)
         {
-            var transaction = new Transaction
+            try
             {
-                Id = Guid.NewGuid(),
-                BankId = request.BankId,
-                TotalAmount = request.Amount,
-                NetAmount = request.Amount,
-                Status = 0,
-                OrderReference = request.OrderReference,
-                TransactionDate = DateTime.Now,
-                TransactionDetails = new List<TransactionDetail>
+                var transaction = new Transaction
+                {
+                    Id = Guid.NewGuid(),
+                    BankId = request.BankId,
+                    TotalAmount = request.Amount,
+                    NetAmount = request.Amount,
+                    Status = 0,
+                    OrderReference = request.OrderReference,
+                    TransactionDate = DateTime.Now,
+                    TransactionDetails = new List<TransactionDetail>
             {
                 new TransactionDetail
                 {
@@ -136,81 +170,123 @@ namespace PaymentApi.Business.Concrete
                     Amount = request.Amount
                 }
             }
-            };
-
-            _dbContext.Transactions.Add(transaction);
-            _dbContext.SaveChanges();
-
-            return new TransactionResult
-            {
-                TransactionId = transaction.Id,
-                Status = (Core.Enums.TransactionStatus)transaction.Status
-            };
-        }
-
-        public TransactionResult Refund(RefundRequest request)
-        {
-            var transaction = _dbContext.Transactions
-             .Include(t => t.TransactionDetails)
-             .FirstOrDefault(t => t.Id == new Guid(request.TransactionId.ToString()));
-
-            if (transaction == null)
-            {
-                return new TransactionResult
-                {
-                    Success = false,
-                    Message = "Transaction not found."
-                };
-            }
-
-            if (transaction.Status == (System.Transactions.TransactionStatus)TransactionStatus.Success &&
-                (DateTime.UtcNow - transaction.TransactionDate).Days >= 1)
-            {
-
-                var refundTransaction = new Transaction
-                {
-                    Id = Guid.NewGuid(),
-                    BankId = transaction.BankId,
-                    TotalAmount = -transaction.TotalAmount,
-                    NetAmount = -transaction.NetAmount,
-                    Status = (System.Transactions.TransactionStatus)TransactionStatus.Success,
-                    OrderReference = transaction.OrderReference,
-                    TransactionDate = DateTime.UtcNow
                 };
 
-
-                var refundTransactionDetail = new TransactionDetail
-                {
-                    Id = Guid.NewGuid(),
-                    TransactionType = TransactionType.Refund,
-                    Status = TransactionStatus.Success,
-                    Amount = -transaction.TotalAmount
-                };
-
-                refundTransaction.TransactionDetails.Add(refundTransactionDetail);
-
-
-                transaction.NetAmount = 0;
-
-
-                _dbContext.Transactions.Add(refundTransaction);
+                _dbContext.Transactions.Add(transaction);
                 _dbContext.SaveChanges();
 
                 return new TransactionResult
                 {
-                    Success = true,
-                    Message = "Refund successful."
+                    TransactionId = transaction.Id,
+                    Status = transaction.Status,
+                    Success = true
                 };
+
             }
-            else
+            catch (Exception ex)
             {
                 return new TransactionResult
                 {
                     Success = false,
-                    Message = "Refund not allowed for this transaction."
+                    Message = ex.Message
                 };
+
             }
 
+        }
+
+        public TransactionResult Refund(RefundRequest request)
+        {
+            using var dbTransaction = _dbContext.Database.BeginTransaction();
+
+            try
+            {
+                var transaction = _dbContext.Transactions
+             .Include(t => t.TransactionDetails)
+             .FirstOrDefault(t => t.Id == new Guid(request.TransactionId));
+
+                if (transaction == null)
+                {
+                    return new TransactionResult
+                    {
+                        Success = false,
+                        Message = "Transaction not found."
+                    };
+                }
+
+                if (transaction.Status == TransactionStatus.Success &&
+                    (DateTime.UtcNow - transaction.TransactionDate).Days >= 1)
+                {
+                    var refundId = Guid.NewGuid();
+                    var refundTransaction = new Transaction
+                    {
+                        Id = refundId,
+                        BankId = transaction.BankId,
+                        TotalAmount = -request.RefundAmount,
+                        NetAmount = transaction.NetAmount - request.RefundAmount,
+                        Status = TransactionStatus.Success,
+                        OrderReference = transaction.OrderReference,
+                        TransactionDate = DateTime.UtcNow
+                    };
+
+                    var refundTransactionDetail = new TransactionDetail
+                    {
+                        Id = Guid.NewGuid(),
+                        TransactionId = refundId,
+                        TransactionType = TransactionType.Refund,
+                        Status = TransactionStatus.Success,
+                        Amount = request.RefundAmount,
+                    };
+
+                    _dbContext.TransactionDetails.Add(refundTransactionDetail);
+
+
+                    transaction.NetAmount = transaction.NetAmount - request.RefundAmount;
+
+                    _dbContext.Transactions.Update(transaction);
+                   
+                    _dbContext.Transactions.Add(refundTransaction);
+
+                    var result = _dbContext.SaveChanges();
+
+                    if (result == 0)
+                    {
+                        throw new Exception();
+                    }
+                    else
+                    {
+                        dbTransaction.Commit();
+                    }
+
+                    return new TransactionResult
+                    {
+                        Success = true,
+                        Status = refundTransaction.Status,
+                        Message = "Refund successful.",
+                        TransactionId = refundId
+                    };
+                }
+                else
+                {
+                    dbTransaction.Rollback();
+
+                    return new TransactionResult
+                    {
+                        Success = false,                       
+                        Message = "Refund not allowed for this transaction."                       
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                dbTransaction.Rollback();
+
+                return new TransactionResult
+                {
+                    Success = false,
+                    Message = ex.Message
+                };
+            }
         }
     }
 }

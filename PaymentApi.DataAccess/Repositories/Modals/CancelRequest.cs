@@ -2,6 +2,6 @@
 {
     public class CancelRequest
     {
-        public int TransactionId { get; set; }
+        public string TransactionId { get; set; }
     }
 }

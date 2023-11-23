@@ -1,12 +1,6 @@
 ﻿using PaymentApi.Core.Enums;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Transactions;
-using TransactionStatus = PaymentApi.Core.Enums.TransactionStatus;
+
 
 namespace PaymentApi.Core.Entities
 {

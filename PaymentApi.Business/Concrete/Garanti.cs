@@ -13,21 +13,21 @@ namespace PaymentApi.Business.Concrete
     {
         public Transaction ProcessCancel(Transaction transaction)
         {
-            transaction.Status = (System.Transactions.TransactionStatus)TransactionStatus.Success;
+            transaction.Status = TransactionStatus.Success;
 
             return transaction;
         }
 
         public Transaction ProcessPay(Transaction transaction)
         {
-            transaction.Status = (System.Transactions.TransactionStatus)TransactionStatus.Success;
+            transaction.Status = TransactionStatus.Success;
 
             return transaction;
         }
 
         public Transaction ProcessRefund(Transaction transaction, decimal refundAmount)
         {
-            transaction.Status = (System.Transactions.TransactionStatus)TransactionStatus.Success;
+            transaction.Status = TransactionStatus.Success;
 
             return transaction;
         }
