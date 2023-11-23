@@ -1,5 +1,6 @@
 ﻿using PaymentApi.Business.Abstract;
 using PaymentApi.Core.Entities;
+using PaymentApi.Core.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,17 +13,23 @@ namespace PaymentApi.Business.Concrete
     {
         public Transaction ProcessCancel(Transaction transaction)
         {
-            throw new NotImplementedException();
+            transaction.Status = (System.Transactions.TransactionStatus)TransactionStatus.Success;
+
+            return transaction;
         }
 
         public Transaction ProcessPay(Transaction transaction)
         {
-            throw new NotImplementedException();
+            transaction.Status = (System.Transactions.TransactionStatus)TransactionStatus.Success;
+
+            return transaction;
         }
 
         public Transaction ProcessRefund(Transaction transaction, decimal refundAmount)
         {
-            throw new NotImplementedException();
+            transaction.Status = (System.Transactions.TransactionStatus)TransactionStatus.Success;
+
+            return transaction;
         }
     }
 }
