@@ -24,6 +24,7 @@ namespace PaymentApi.Business.Concrete
         {
             _dbContext = dbContext;
         }
+
         public TransactionResult Cancel(CancelRequest request)
         {
             var transaction = _dbContext.Transactions
@@ -98,13 +99,13 @@ namespace PaymentApi.Business.Concrete
                     (request.StartDate == null || t.TransactionDate >= request.StartDate) &&
                     (request.EndDate == null || t.TransactionDate <= request.EndDate));
 
-            
+
             if (request.TransactionType != null)
             {
                 query = query.Where(t => t.TransactionDetails.Any(td => td.TransactionType == request.TransactionType));
             }
 
-           
+
             var report = new TransactionReport
             {
                 Transactions = query.ToList(),
@@ -149,7 +150,66 @@ namespace PaymentApi.Business.Concrete
 
         public TransactionResult Refund(RefundRequest request)
         {
-            throw new NotImplementedException();
+            var transaction = _dbContext.Transactions
+             .Include(t => t.TransactionDetails)
+             .FirstOrDefault(t => t.Id == new Guid(request.TransactionId.ToString()));
+
+            if (transaction == null)
+            {
+                return new TransactionResult
+                {
+                    Success = false,
+                    Message = "Transaction not found."
+                };
+            }
+
+            if (transaction.Status == (System.Transactions.TransactionStatus)TransactionStatus.Success &&
+                (DateTime.UtcNow - transaction.TransactionDate).Days >= 1)
+            {
+
+                var refundTransaction = new Transaction
+                {
+                    Id = Guid.NewGuid(),
+                    BankId = transaction.BankId,
+                    TotalAmount = -transaction.TotalAmount,
+                    NetAmount = -transaction.NetAmount,
+                    Status = (System.Transactions.TransactionStatus)TransactionStatus.Success,
+                    OrderReference = transaction.OrderReference,
+                    TransactionDate = DateTime.UtcNow
+                };
+
+
+                var refundTransactionDetail = new TransactionDetail
+                {
+                    Id = Guid.NewGuid(),
+                    TransactionType = TransactionType.Refund,
+                    Status = TransactionStatus.Success,
+                    Amount = -transaction.TotalAmount
+                };
+
+                refundTransaction.TransactionDetails.Add(refundTransactionDetail);
+
+
+                transaction.NetAmount = 0;
+
+
+                _dbContext.Transactions.Add(refundTransaction);
+                _dbContext.SaveChanges();
+
+                return new TransactionResult
+                {
+                    Success = true,
+                    Message = "Refund successful."
+                };
+            }
+            else
+            {
+                return new TransactionResult
+                {
+                    Success = false,
+                    Message = "Refund not allowed for this transaction."
+                };
+            }
 
         }
     }
