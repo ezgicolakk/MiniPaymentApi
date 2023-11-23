@@ -18,7 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PaymentApi.Core\PaymentApi.Core.csproj" />
-    <ProjectReference Include="..\PaymentApi.Core\PaymentApi.Core.csproj" />
   </ItemGroup>
 
 </Project>
